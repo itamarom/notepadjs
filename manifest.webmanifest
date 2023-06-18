@@ -1,0 +1,1 @@
+{"name":"Notepad","short_name":"Notepad","start_url":"/notepadjs/","display":"standalone","background_color":"#ffffff","lang":"en","scope":"/notepadjs/","description":"A Notepad PWA","theme_color":"#cdddec","icons":[{"src":"pwa-192x192.png","sizes":"192x192","type":"image/png"},{"src":"pwa-512x512.png","sizes":"512x512","type":"image/png"}]}
