@@ -5,11 +5,15 @@ import Editor from '../components/Editor.vue'
 import Menu from '../components/Menu.vue'
 import Tabs from '../components/Tabs.vue'
 import type { Tab } from '../types/types'
+import { LocalFs } from '@/lib/local-fs'
+import type { IFileSystemFileHandle } from '@/lib/fs'
 
 const tabs = ref<Tab[]>([])
 const activeTab = ref<Tab | null>(null)
 
 const isPwa = ref(false);
+
+const fs = new LocalFs();
 
 window.addEventListener('DOMContentLoaded', () => {
   if (window.matchMedia('(display-mode: standalone)').matches) {
@@ -55,7 +59,7 @@ const isEmptyState = () =>
   tabs.value[0].handle === undefined &&
   tabs.value[0].content.length === 0
 
-const findTabByHandle = async (handle: FileSystemFileHandle) => {
+const findTabByHandle = async (handle: IFileSystemFileHandle) => {
   for (const tab of tabs.value) {
     if (tab.handle && (await tab.handle.isSameEntry(handle))) {
       return tab
@@ -94,7 +98,7 @@ onUnmounted(() => {
   window.removeEventListener('beforeunload', beforeWindowUnload)
 })
 
-const openFileTab = async (handle: FileSystemFileHandle) => {
+const openFileTab = async (handle: IFileSystemFileHandle) => {
   const existingTab = await findTabByHandle(handle)
 
   if (existingTab) {
@@ -102,14 +106,13 @@ const openFileTab = async (handle: FileSystemFileHandle) => {
     return
   }
 
-  const file = await handle.getFile()
 
   const newTab: Tab = {
     id: uuidv4(),
     unsaved: false,
     title: handle.name,
     handle,
-    content: await file.text()
+    content: await handle.getContent()
   }
 
   if (isEmptyState()) {
@@ -139,7 +142,7 @@ onMounted(() => {
 
 const handleOpen = () => {
   // TODO: Fix FS API types
-  (window as any).showOpenFilePicker().then((handles: any) => openFileTab(handles[0]))
+  fs.showOpenFilePicker((handles: IFileSystemFileHandle[]) => openFileTab(handles[0]))
 }
 
 const handleSave = async (as: boolean) => {
@@ -148,24 +151,12 @@ const handleSave = async (as: boolean) => {
   }
 
   if (as || activeTab.value.handle === undefined) {
-    const opts = {
-      suggestedName: activeTab.value.handle?.name,
-      types: [
-        {
-          accept: { 'text/plain': ['.txt'] }
-        }
-      ]
-    }
-    // TODO: Fix FS API types
-    const handle = await (window as any).showSaveFilePicker(opts)
+    const handle = await fs.showSaveFilePicker(activeTab.value.handle?.name)
     activeTab.value.handle = handle
     activeTab.value.title = handle.name
   }
 
-  // TODO: Fix FS API types
-  const writeable = await (activeTab.value.handle! as any).createWritable()
-  await writeable.write(activeTab.value.content)
-  await writeable.close()
+  await activeTab.value.handle!.writeContent(activeTab.value.content);
 
   activeTab.value.unsaved = false
 }
