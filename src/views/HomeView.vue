@@ -149,9 +149,9 @@ const handleSave = async (as: boolean) => {
 
   if (as || activeTab.value.handle === undefined) {
     const opts = {
+      suggestedName: activeTab.value.handle?.name,
       types: [
         {
-          description: 'Untitled',
           accept: { 'text/plain': ['.txt'] }
         }
       ]
