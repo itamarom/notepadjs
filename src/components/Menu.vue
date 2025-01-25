@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import MenuItem from './MenuItem.vue'
+import { LocalFs } from '@/lib/local-fs';
+import { getPreferredFsType, FsType } from '@/lib/preferences';
 
-const activeItem = ref<string|null>(null);
+const activeItem = ref<string | null>(null);
 
 const emit = defineEmits<{
-  (e: 'itemClicked', item: string): void
+  (e: 'itemClicked', item: unknown): void,
+  (e: 'changeFsType', fsType: unknown): void
 }>()
 
 const onWindowClick = () => {
@@ -30,16 +33,30 @@ onUnmounted(() => {
   window.removeEventListener('click', onWindowClick);
 })
 
-const handleSubItemClicked = (item: string) => {
+const handleSubItemClicked = (item: unknown) => {
   activeItem.value = null;
   emit('itemClicked', item)
 }
+
+const preferredFsType = getPreferredFsType();
 
 </script>
 
 <template>
   <div class="container">
-    <MenuItem title="File" :options="['New','Open','Save','Save as...']" @click="onItemClick" v-bind:activeItem="activeItem" @subItemClicked="handleSubItemClicked"/>
+    <MenuItem title="File" :options="[{ text: 'New' }, { text: 'Open' }, { text: 'Save' }, { text: 'Save as...' }]"
+      @click="onItemClick" v-bind:activeItem="activeItem" @subItemClicked="handleSubItemClicked" />
+    <MenuItem title="File system" :options="[{
+      text: 'Local',
+      disabled: !LocalFs.isSupported(),
+      checked: preferredFsType === FsType.localFs,
+      value: FsType.localFs
+    },
+    {
+      text: 'Local storage',
+      checked: getPreferredFsType() === FsType.localStorageFs,
+      value: FsType.localStorageFs
+    }]" @click="onItemClick" v-bind:activeItem="activeItem" @subItemClicked="emit('changeFsType', $event)" />
   </div>
 </template>
 
@@ -55,5 +72,4 @@ const handleSubItemClicked = (item: string) => {
   align-items: flex-start;
   background-color: #F0F5F9;
 }
-
 </style>

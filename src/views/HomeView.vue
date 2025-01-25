@@ -1,14 +1,23 @@
 <script setup lang="ts">
+import type { FileSelectedCallback, IFileSystem, IFileSystemFileHandle } from '@/lib/fs'
+import { LocalStorageFs } from '@/lib/local-storage-fs'
 import { v4 as uuidv4 } from 'uuid'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import Editor from '../components/Editor.vue'
+import LocalStorageOpenModal from '../components/LocalStorageOpenModal.vue'
+import LocalStorageSaveModal from '../components/LocalStorageSaveModal.vue'
 import Menu from '../components/Menu.vue'
 import Tabs from '../components/Tabs.vue'
 import type { Tab } from '../types/types'
+import { LocalFs } from '@/lib/local-fs'
+import { FsType, getPreferredFsType, setPreferredFsType } from '@/lib/preferences'
+
 
 const tabs = ref<Tab[]>([])
 const activeTab = ref<Tab | null>(null)
 
+const openLocalStorageFileCallback = ref<FileSelectedCallback | null>(null);
+const saveLocalStorageFileCallback = ref<FileSelectedCallback | null>(null);
 const isPwa = ref(false);
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -55,7 +64,7 @@ const isEmptyState = () =>
   tabs.value[0].handle === undefined &&
   tabs.value[0].content.length === 0
 
-const findTabByHandle = async (handle: FileSystemFileHandle) => {
+const findTabByHandle = async (handle: IFileSystemFileHandle) => {
   for (const tab of tabs.value) {
     if (tab.handle && (await tab.handle.isSameEntry(handle))) {
       return tab
@@ -77,9 +86,13 @@ const onWindowKeyDown = (e: KeyboardEvent) => {
   }
 }
 
-const beforeWindowUnload = (e: Event) => {
+const anyUnsavedTabs = () => {
   const unsavedTabs = tabs.value.filter((tab) => tab.unsaved)
-  if (unsavedTabs.length > 0) {
+  return (unsavedTabs.length > 0);
+}
+
+const beforeWindowUnload = (e: Event) => {
+  if (anyUnsavedTabs()) {
     e.preventDefault();
   }
 };
@@ -94,7 +107,7 @@ onUnmounted(() => {
   window.removeEventListener('beforeunload', beforeWindowUnload)
 })
 
-const openFileTab = async (handle: FileSystemFileHandle) => {
+const openFileTab = async (handle: IFileSystemFileHandle) => {
   const existingTab = await findTabByHandle(handle)
 
   if (existingTab) {
@@ -102,14 +115,13 @@ const openFileTab = async (handle: FileSystemFileHandle) => {
     return
   }
 
-  const file = await handle.getFile()
 
   const newTab: Tab = {
     id: uuidv4(),
     unsaved: false,
     title: handle.name,
     handle,
-    content: await file.text()
+    content: await handle.getContent()
   }
 
   if (isEmptyState()) {
@@ -121,6 +133,28 @@ const openFileTab = async (handle: FileSystemFileHandle) => {
 
   activeTab.value = newTab
 }
+
+function getFilesystem(): IFileSystem {
+  const preferredFsType = getPreferredFsType();
+
+  if (preferredFsType === FsType.localFs && LocalFs.isSupported()) {
+    return new LocalFs();
+  }
+
+  return new LocalStorageFs(localStorage, (callback) => {
+    openLocalStorageFileCallback.value = (handle) => {
+      callback(handle);
+      openLocalStorageFileCallback.value = null;
+    };
+  }, (_suggestedName, callback) => {
+    saveLocalStorageFileCallback.value = (handle) => {
+      callback(handle);
+      saveLocalStorageFileCallback.value = null;
+    };
+  });
+}
+
+const fs = getFilesystem();
 
 const handleValueChange = (e: Event) => {
   const target = e.target as HTMLTextAreaElement
@@ -138,8 +172,7 @@ onMounted(() => {
 })
 
 const handleOpen = () => {
-  // TODO: Fix FS API types
-  (window as any).showOpenFilePicker().then((handles: any) => openFileTab(handles[0]))
+  fs.showOpenFilePicker(openFileTab)
 }
 
 const handleSave = async (as: boolean) => {
@@ -148,28 +181,32 @@ const handleSave = async (as: boolean) => {
   }
 
   if (as || activeTab.value.handle === undefined) {
-    const opts = {
-      types: [
-        {
-          description: 'Untitled',
-          accept: { 'text/plain': ['.txt'] }
-        }
-      ]
-    }
-    // TODO: Fix FS API types
-    const handle = await (window as any).showSaveFilePicker(opts)
-    activeTab.value.handle = handle
-    activeTab.value.title = handle.name
+    fs.showSaveFilePicker(activeTab.value.handle?.name, (handle) => {
+      if (!activeTab.value) {
+        console.warn('No active tab');
+        return;
+      }
+      activeTab.value.handle = handle
+      activeTab.value.title = handle.name
+      saveFileToHandle();
+    })
+  } else {
+    saveFileToHandle();
   }
 
-  // TODO: Fix FS API types
-  const writeable = await (activeTab.value.handle! as any).createWritable()
-  await writeable.write(activeTab.value.content)
-  await writeable.close()
+}
 
+const saveFileToHandle = async () => {
+  if (!activeTab.value) {
+    console.warn('No active tab');
+    return;
+  }
+
+  await activeTab.value.handle!.writeContent(activeTab.value.content);
   activeTab.value.unsaved = false
 }
-const handleMenuItemClicked = (item: string) => {
+
+const handleMenuItemClicked = (item: unknown) => {
   if (item === 'New') {
     addNewTab()
   } else if (item === 'Open') {
@@ -181,6 +218,21 @@ const handleMenuItemClicked = (item: string) => {
   }
 }
 
+const handleChangeFsType = (fsType: unknown) => {
+  if (anyUnsavedTabs()) {
+    alert('You have unsaved changes. Please save them before changing the file system.');
+    return;
+  }
+
+  if (!Object.values(FsType).includes(fsType as FsType)) {
+    console.warn(`Unknown fsType: ${fsType}`);
+    return;
+  }
+
+  setPreferredFsType(fsType as FsType);
+  window.location.reload();
+}
+
 watch(activeTab, (newTab) => {
   const prefix = isPwa.value ? '' : 'Notepad - '
   document.title = `${prefix}${newTab?.title || 'Untitled'}`
@@ -190,19 +242,18 @@ watch(activeTab, (newTab) => {
 
 <template>
   <div class="container">
-    <Tabs
-      v-bind:tabs="tabs"
-      v-bind:selected-tab-id="activeTab?.id || ''"
-      @tab-selected="($tab) => (activeTab = $tab)"
-      @tab-closed="handleCloseTab"
-      @new-tab="addNewTab"
-    />
-    <Menu @item-clicked="handleMenuItemClicked" />
-    <Editor
-      :key="activeTab?.id"
-      @change="handleValueChange"
-      :initial-value="activeTab?.content || ''"
-    />
+    <Tabs v-bind:tabs="tabs" v-bind:selected-tab-id="activeTab?.id || ''" @tab-selected="($tab) => (activeTab = $tab)"
+      @tab-closed="handleCloseTab" @new-tab="addNewTab" />
+    <Menu @item-clicked="handleMenuItemClicked" @change-fs-type="handleChangeFsType" />
+
+    <template v-if="fs instanceof LocalStorageFs">
+      <LocalStorageOpenModal v-if="openLocalStorageFileCallback" @close="openLocalStorageFileCallback = null" :fs="fs"
+        @file-selected="openLocalStorageFileCallback" />
+      <LocalStorageSaveModal v-if="saveLocalStorageFileCallback" @close="() => saveLocalStorageFileCallback = null"
+        :fs="fs" @file-selected="saveLocalStorageFileCallback" />
+    </template>
+
+    <Editor :key="activeTab?.id" @change="handleValueChange" :initial-value="activeTab?.content || ''" />
   </div>
 </template>
 
@@ -210,6 +261,7 @@ watch(activeTab, (newTab) => {
 * {
   color: black;
 }
+
 .container {
   display: flex;
   flex-direction: column;
