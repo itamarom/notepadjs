@@ -46,7 +46,8 @@ export class LocalFsFileHandle implements IFileSystemFileHandle {
     }
 
     async writeContent(content: string) {
-        const writable = await this._handle.createWritable()
+        // TODO: Fix FS API types
+        const writable = await (this._handle as any).createWritable()
         await writable.write(content)
         await writable.close()
     }
