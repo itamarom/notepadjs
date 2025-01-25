@@ -14,7 +14,7 @@ After [opening the app](https://itamarom.github.io/notepadjs/), click on the "In
 
 ## About
 
-As a native Windows user who switched to macOS a few years back, one thing I never got over was the simplicity and usefulness of the old school Notepad app. This app aims to recreate that very same experience. It uses a fairly modern [File System Access API](https://wicg.github.io/file-system-access/) to allow reading and writing of local files.
+As a native Windows user who switched to macOS a few years back, one thing I never got over was the simplicity and usefulness of the old school Notepad app. This app aims to recreate that very same experience. It uses a fairly modern [File System Access API](https://wicg.github.io/file-system-access/) to allow reading and writing of local files. Unfortunately, this means it currently does not work on FireFox. To overcome this, local storage support will be implemented in the future.
 
 Also worth mentioning: this is my first time using Vue, so some things might not make perfect sense. Criticism, issues and PRs are welcome.
 
@@ -23,6 +23,8 @@ Also worth mentioning: this is my first time using Vue, so some things might not
 - [X] Notepad-like UI
 - [X] Allow Local FS operations
 - [X] Installable as a PWA
+- [ ] Implement font selection dialog
+- [ ] Implement local storage support
 - [ ] Pixel perfect Notepad UI 
 
 ## Project Setup
