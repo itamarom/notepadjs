@@ -1,19 +1,23 @@
 <script setup lang="ts">
+import type { FileSelectedCallback, IFileSystem, IFileSystemFileHandle } from '@/lib/fs'
+import { LocalStorageFs } from '@/lib/local-storage-fs'
 import { v4 as uuidv4 } from 'uuid'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import Editor from '../components/Editor.vue'
+import LocalStorageOpenModal from '../components/LocalStorageOpenModal.vue'
+import LocalStorageSaveModal from '../components/LocalStorageSaveModal.vue'
 import Menu from '../components/Menu.vue'
 import Tabs from '../components/Tabs.vue'
 import type { Tab } from '../types/types'
 import { LocalFs } from '@/lib/local-fs'
-import type { IFileSystemFileHandle } from '@/lib/fs'
+
 
 const tabs = ref<Tab[]>([])
 const activeTab = ref<Tab | null>(null)
 
+const openLocalStorageFileCallback = ref<FileSelectedCallback | null>(null);
+const saveLocalStorageFileCallback = ref<FileSelectedCallback | null>(null);
 const isPwa = ref(false);
-
-const fs = new LocalFs();
 
 window.addEventListener('DOMContentLoaded', () => {
   if (window.matchMedia('(display-mode: standalone)').matches) {
@@ -125,6 +129,26 @@ const openFileTab = async (handle: IFileSystemFileHandle) => {
   activeTab.value = newTab
 }
 
+function getFilesystem(): IFileSystem {
+  if (LocalFs.isSupported()) {
+    return new LocalFs();
+  }
+
+  return new LocalStorageFs(localStorage, (callback) => {
+    openLocalStorageFileCallback.value = (handle) => {
+      callback(handle);
+      openLocalStorageFileCallback.value = null;
+    };
+  }, (_suggestedName, callback) => {
+    saveLocalStorageFileCallback.value = (handle) => {
+      callback(handle);
+      saveLocalStorageFileCallback.value = null;
+    };
+  });
+}
+
+const fs = getFilesystem();
+
 const handleValueChange = (e: Event) => {
   const target = e.target as HTMLTextAreaElement
 
@@ -141,8 +165,7 @@ onMounted(() => {
 })
 
 const handleOpen = () => {
-  // TODO: Fix FS API types
-  fs.showOpenFilePicker((handles: IFileSystemFileHandle[]) => openFileTab(handles[0]))
+  fs.showOpenFilePicker(openFileTab)
 }
 
 const handleSave = async (as: boolean) => {
@@ -151,15 +174,31 @@ const handleSave = async (as: boolean) => {
   }
 
   if (as || activeTab.value.handle === undefined) {
-    const handle = await fs.showSaveFilePicker(activeTab.value.handle?.name)
-    activeTab.value.handle = handle
-    activeTab.value.title = handle.name
+    fs.showSaveFilePicker(activeTab.value.handle?.name, (handle) => {
+      if (!activeTab.value) {
+        console.warn('No active tab');
+        return;
+      }
+      activeTab.value.handle = handle
+      activeTab.value.title = handle.name
+      saveFileToHandle();
+    })
+  } else {
+    saveFileToHandle();
+  }
+
+}
+
+const saveFileToHandle = async () => {
+  if (!activeTab.value) {
+    console.warn('No active tab');
+    return;
   }
 
   await activeTab.value.handle!.writeContent(activeTab.value.content);
-
   activeTab.value.unsaved = false
 }
+
 const handleMenuItemClicked = (item: string) => {
   if (item === 'New') {
     addNewTab()
@@ -181,19 +220,18 @@ watch(activeTab, (newTab) => {
 
 <template>
   <div class="container">
-    <Tabs
-      v-bind:tabs="tabs"
-      v-bind:selected-tab-id="activeTab?.id || ''"
-      @tab-selected="($tab) => (activeTab = $tab)"
-      @tab-closed="handleCloseTab"
-      @new-tab="addNewTab"
-    />
+    <Tabs v-bind:tabs="tabs" v-bind:selected-tab-id="activeTab?.id || ''" @tab-selected="($tab) => (activeTab = $tab)"
+      @tab-closed="handleCloseTab" @new-tab="addNewTab" />
     <Menu @item-clicked="handleMenuItemClicked" />
-    <Editor
-      :key="activeTab?.id"
-      @change="handleValueChange"
-      :initial-value="activeTab?.content || ''"
-    />
+    
+    <template v-if="fs instanceof LocalStorageFs">
+      <LocalStorageOpenModal v-if="openLocalStorageFileCallback" :fs="fs"
+        @file-selected="openLocalStorageFileCallback" />
+      <LocalStorageSaveModal v-if="saveLocalStorageFileCallback" @close="() => saveLocalStorageFileCallback = null"
+        :fs="fs" @file-selected="saveLocalStorageFileCallback" />
+    </template>
+
+    <Editor :key="activeTab?.id" @change="handleValueChange" :initial-value="activeTab?.content || ''" />
   </div>
 </template>
 
@@ -201,6 +239,7 @@ watch(activeTab, (newTab) => {
 * {
   color: black;
 }
+
 .container {
   display: flex;
   flex-direction: column;

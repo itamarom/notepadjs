@@ -1,15 +1,17 @@
-import type { IFileSystem, IFileSystemFileHandle } from "./fs";
+import type { FileSelectedCallback, IFileSystem, IFileSystemFileHandle } from "./fs";
 
 export class LocalFs implements IFileSystem {
     static isSupported() {
         return (window as any).showOpenFilePicker !== undefined && (window as any).showSaveFilePicker !== undefined;
     }
 
-    showOpenFilePicker(callback: (handles: LocalFsFileHandle[]) => void) {
-        return (window as any).showOpenFilePicker().then((handles: FileSystemFileHandle[]) => callback(handles.map(handle => new LocalFsFileHandle(handle))));
+    showOpenFilePicker(fileOpenedCallback: FileSelectedCallback) {
+        // TODO: Do we want to support multiple files?
+        // TODO: Fix FS API types
+        return (window as any).showOpenFilePicker().then((handles: FileSystemFileHandle[]) => fileOpenedCallback(new LocalFsFileHandle(handles[0])));
     }
 
-    async showSaveFilePicker(suggestedName?: string): Promise<IFileSystemFileHandle> {
+    showSaveFilePicker(suggestedName: string | undefined, fileSavedCallback: FileSelectedCallback): void {
         const opts = {
             suggestedName,
             types: [
@@ -19,7 +21,8 @@ export class LocalFs implements IFileSystem {
             ]
         }
         // TODO: Fix FS API types
-        return await (window as any).showSaveFilePicker(opts)
+        const handlePromise: Promise<FileSystemFileHandle> = (window as any).showSaveFilePicker(opts);
+        handlePromise.then(handle => fileSavedCallback(new LocalFsFileHandle(handle)));
     }
 }
 
