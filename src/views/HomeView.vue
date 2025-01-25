@@ -10,6 +10,7 @@ import Menu from '../components/Menu.vue'
 import Tabs from '../components/Tabs.vue'
 import type { Tab } from '../types/types'
 import { LocalFs } from '@/lib/local-fs'
+import { FsType, getPreferredFsType, setPreferredFsType } from '@/lib/preferences'
 
 
 const tabs = ref<Tab[]>([])
@@ -85,9 +86,13 @@ const onWindowKeyDown = (e: KeyboardEvent) => {
   }
 }
 
-const beforeWindowUnload = (e: Event) => {
+const anyUnsavedTabs = () => {
   const unsavedTabs = tabs.value.filter((tab) => tab.unsaved)
-  if (unsavedTabs.length > 0) {
+  return (unsavedTabs.length > 0);
+}
+
+const beforeWindowUnload = (e: Event) => {
+  if (anyUnsavedTabs()) {
     e.preventDefault();
   }
 };
@@ -130,7 +135,9 @@ const openFileTab = async (handle: IFileSystemFileHandle) => {
 }
 
 function getFilesystem(): IFileSystem {
-  if (LocalFs.isSupported()) {
+  const preferredFsType = getPreferredFsType();
+
+  if (preferredFsType === FsType.localFs && LocalFs.isSupported()) {
     return new LocalFs();
   }
 
@@ -199,7 +206,7 @@ const saveFileToHandle = async () => {
   activeTab.value.unsaved = false
 }
 
-const handleMenuItemClicked = (item: string) => {
+const handleMenuItemClicked = (item: unknown) => {
   if (item === 'New') {
     addNewTab()
   } else if (item === 'Open') {
@@ -209,6 +216,21 @@ const handleMenuItemClicked = (item: string) => {
   } else if (item === 'Save as...') {
     handleSave(true)
   }
+}
+
+const handleChangeFsType = (fsType: unknown) => {
+  if (anyUnsavedTabs()) {
+    alert('You have unsaved changes. Please save them before changing the file system.');
+    return;
+  }
+
+  if (!Object.values(FsType).includes(fsType as FsType)) {
+    console.warn(`Unknown fsType: ${fsType}`);
+    return;
+  }
+
+  setPreferredFsType(fsType as FsType);
+  window.location.reload();
 }
 
 watch(activeTab, (newTab) => {
@@ -222,10 +244,10 @@ watch(activeTab, (newTab) => {
   <div class="container">
     <Tabs v-bind:tabs="tabs" v-bind:selected-tab-id="activeTab?.id || ''" @tab-selected="($tab) => (activeTab = $tab)"
       @tab-closed="handleCloseTab" @new-tab="addNewTab" />
-    <Menu @item-clicked="handleMenuItemClicked" />
-    
+    <Menu @item-clicked="handleMenuItemClicked" @change-fs-type="handleChangeFsType" />
+
     <template v-if="fs instanceof LocalStorageFs">
-      <LocalStorageOpenModal v-if="openLocalStorageFileCallback" :fs="fs"
+      <LocalStorageOpenModal v-if="openLocalStorageFileCallback" @close="openLocalStorageFileCallback = null" :fs="fs"
         @file-selected="openLocalStorageFileCallback" />
       <LocalStorageSaveModal v-if="saveLocalStorageFileCallback" @close="() => saveLocalStorageFileCallback = null"
         :fs="fs" @file-selected="saveLocalStorageFileCallback" />
