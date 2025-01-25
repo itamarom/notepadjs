@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { Tab } from '../types/types'
+import { v4 as uuidv4 } from 'uuid'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import Editor from '../components/Editor.vue'
 import Menu from '../components/Menu.vue'
 import Tabs from '../components/Tabs.vue'
-import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { v4 as uuidv4 } from 'uuid'
+import type { Tab } from '../types/types'
 
 const tabs = ref<Tab[]>([])
 const activeTab = ref<Tab | null>(null)

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { type Tab } from '../types/types'
-
+import BetaIcon from './BetaIcon.vue'
+import { isBeta } from '@/lib/build-params';
 const ScrollDelta = 50;
 
 const props = defineProps<{
@@ -49,6 +50,7 @@ onUnmounted(() => {
 <template>
   <div class="container">
     <img class="logo" src="/Notepad.png" />
+    <BetaIcon v-if="isBeta" />
     <button v-if="scrolling" @click="($event) => (tabsContainer!.scrollLeft -= ScrollDelta)">
       &lt;
     </button>

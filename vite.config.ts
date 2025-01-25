@@ -10,6 +10,10 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig({
   server: { https: true },
   base: '/notepadjs',
+  define: {
+    IS_BETA: 0,
+    APP_VERSION: JSON.stringify(process.env.npm_package_version),
+  },
   plugins: [
     VitePWA({
       injectRegister: 'auto',
