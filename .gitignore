@@ -26,3 +26,4 @@ coverage
 *.sln
 *.sw?
 dev-dist
+env.sh
