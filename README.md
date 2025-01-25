@@ -25,6 +25,7 @@ Also worth mentioning: this is my first time using Vue, so some things might not
 - [X] Installable as a PWA
 - [ ] Implement font selection dialog
 - [ ] Implement local storage support
+- [ ] Keep tab state and unsaved drafts between sessions
 - [ ] Pixel perfect Notepad UI 
 
 ## Project Setup
