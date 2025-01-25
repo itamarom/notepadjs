@@ -26,5 +26,6 @@
   padding: 4px;
   border-radius: 4px;
   width: 400px;
+  z-index: 2;
 }
 </style>
