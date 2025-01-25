@@ -26,6 +26,14 @@ const onResize = () => {
   }
 }
 
+const onMouseDown = (event: MouseEvent, tab: Tab) => {
+  const wheelButtonClicked = (event.button === 1);
+
+  if (wheelButtonClicked) {
+    emit('tabClosed', tab)
+  }
+}
+
 onMounted(() => {
   resizeObserver = new ResizeObserver(onResize)
   resizeObserver.observe(tabsContainer.value!)
@@ -51,7 +59,7 @@ onUnmounted(() => {
         class="tab"
         :class="{ selected: props.selectedTabId === tab.id }"
         @click="emit('tabSelected', tab)"
-        @auxclick="emit('tabClosed', tab)"
+        @mousedown="e => onMouseDown(e, tab)"
       >
         {{ tab.title || 'Untitled' }}
         <div class="tab-unsaved-dot" v-if="tab.unsaved"></div>
