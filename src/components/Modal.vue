@@ -1,8 +1,24 @@
 <script setup lang="ts">
+import { onMounted, onUnmounted } from 'vue';
+
 
 const emit = defineEmits<{
     (e: 'close'): void,
 }>()
+
+const onWindowKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+        emit('close');
+    }
+}
+
+onMounted(() => {
+    window.addEventListener('keydown', onWindowKeyDown)
+})
+
+onUnmounted(() => {
+    window.removeEventListener('keydown', onWindowKeyDown)
+})
 </script>
 
 <template>
