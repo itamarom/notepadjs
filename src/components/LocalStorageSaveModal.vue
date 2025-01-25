@@ -24,7 +24,6 @@ onMounted(() => {
 async function fileAlreadyExists(fileHandle: IFileSystemFileHandle) {
     for (const f of files.value) {
         const same = await f.isSameEntry(fileHandle);
-        console.log({ fileHandle, f, same });
         if (same) {
             return true;
         }
