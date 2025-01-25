@@ -5,8 +5,10 @@
   "scripts": {
     "dev": "vite",
     "build": "run-p type-check build-only",
+    "build-beta": "run-p type-check build-only-beta",
     "preview": "vite preview",
     "build-only": "vite build",
+    "build-only-beta": "vite build --config vite.beta.config.ts",
     "type-check": "vue-tsc --noEmit -p tsconfig.app.json --composite false",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
     "format": "prettier --write src/",
