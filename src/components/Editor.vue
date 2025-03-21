@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted } from 'vue'
+import { getLastFontSize, setLastFontSize } from '@/lib/preferences';
+import { reactive, ref, onMounted, watch } from 'vue'
 
 const props = defineProps<{
   initialValue: string
@@ -19,9 +20,14 @@ const status = reactive({
 const direction = ref('ltr')
 const prevValue = ref(props.initialValue)
 
-const DefaultFontSize = 20
+const StartFontSize = 20
+
 const FontSizeDelta = 2
-const fontSize = ref(DefaultFontSize)
+const fontSize = ref(getLastFontSize())
+
+watch(fontSize, (newSize: number) => {
+  setLastFontSize(newSize)
+})
 
 const onKeyDown = function (e: KeyboardEvent) {
   const target = e.target as HTMLTextAreaElement
@@ -45,7 +51,7 @@ const onKeyDown = function (e: KeyboardEvent) {
   }
 
   if (e.ctrlKey && e.key === '0') {
-    fontSize.value = DefaultFontSize
+    fontSize.value = StartFontSize
   }
 
   if (e.ctrlKey && e.code == 'ShiftLeft') {
